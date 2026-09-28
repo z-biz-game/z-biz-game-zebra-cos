@@ -1,0 +1,17 @@
+{
+  "name": "zebra",
+  "version": "0.1.0",
+  "description": "谁养鱼 ZEBRA — 纸笔逻辑格（N 类 × N 户的唯一解推理）. 出货的每一盘都同时被两条独立通道判过：铅笔求解器（P1–P8，不回溯）从空盘推到底，传播引导的穷举裁判以 limitSolutions:2 证「恰好一个解」。档位 band 与 budgetMs 由 tools/balance.mjs 量出来回填，不是标签.",
+  "type": "module",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs",
+    "dev": "node server.cjs 5321",
+    "test": "node --test test/ && node tools/rule-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs",
+    "balance": "node tools/balance.mjs",
+    "check": "for f in $(find js tools test -name '*.js' -o -name '*.mjs'); do node --check \"$f\" || exit 1; done && node --check server.cjs && echo OK"
+  },
+  "keywords": ["game", "puzzle", "zebra", "logic-grid", "csp", "nikoli", "procedural", "web"],
+  "author": "z-biz-game",
+  "license": "MIT"
+}

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>谁养鱼 ZEBRA · 阶段一占位</title>
+<link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+  <header>
+    <h1>谁养鱼 <small>ZEBRA · 逻辑格</small></h1>
+    <p class="stage">阶段一：引擎与度量闸。<b>这里只有出题与题面渲染，没有铅笔注记、没有提示、没有关卡包</b> —— 交互在阶段二落地。</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <label>档位
+        <select id="tier"></select>
+      </label>
+      <label>盘号
+        <input id="seed" type="text" value="0" spellcheck="false" maxlength="24">
+      </label>
+      <button id="next" type="button">下一盘</button>
+      <span id="status" class="status"></span>
+    </section>
+
+    <section class="board">
+      <canvas id="grid" width="560" height="360" aria-label="逻辑格与房子">此游戏需要支持 canvas 的浏览器。</canvas>
+    </section>
+
+    <section class="clues">
+      <h2>题面</h2>
+      <ol id="cluelist"></ol>
+      <h2>出货回执（引擎自己记的账）</h2>
+      <pre id="receipt"></pre>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

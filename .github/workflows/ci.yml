@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: syntax + engine guarantees
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No npm install: zero runtime dependencies and no build step. Pulling a package graph
+      # into CI to prove nothing is how a repo starts failing on a network flake.
+      - name: Syntax check every source
+        run: |
+          for f in $(git ls-files 'js/*.js' 'js/*/*.js'); do node --check "$f" || exit 1; done
+          for f in $(git ls-files 'tools/*.mjs'); do node --check "$f" || exit 1; done
+          for f in $(git ls-files 'test/*.mjs'); do node --check "$f" || exit 1; done
+          node --check server.cjs
+
+      # The layering invariant: `js/` ships to the browser, `tools/` does not. A runtime module
+      # importing tools/ is either a 404 in production or bench code served as product code —
+      # and then no gate below can be read as "the shipped bundle is the tested code".
+      - name: js/ never imports tools/
+        run: |
+          if grep -rnE "(import|export)[^;]*from '[^']*tools/" js/ ; then
+            echo '::error::运行时模块（js/）去够了 tools/ —— 分层又倒了'
+            exit 1
+          fi
+
+      - name: Entry file really wires the engine
+        run: |
+          grep -q '<canvas' index.html
+          grep -q 'js/main.js' index.html
+          grep -q './engine/generate.js' js/main.js
+
+      #  unit tests：改动时最想立刻看见的那几条（每种线索的语义、stopped 的读法、跨进程复现）。
+      - name: Unit tests (node --test)
+        run: node --test test/
+
+      # 三道定义闸。数字是契约：rule-test 1353 / counter-test 285 / pencil-test 31（本机
+      # 2026-09-28 实跑），红了先读 Reason 行，不要去看退出码就好。
+      - name: Rule tests (legal-board definition, 11 clue kinds pinned twice)
+        run: node tools/rule-test.mjs
+
+      - name: Counter tests (referee vs. propagation-free witness, stopped semantics)
+        run: node tools/counter-test.mjs
+
+      - name: Pencil tests (every deduction audited against ground truth)
+        run: node tools/pencil-test.mjs
+
+      # 难度实测台：TIERS[].band 与 TIERS[].budgetMs 是**这张表**回填出来的选择目标。
+      # 一档不再落在自己的 band 里、出货盘推不完、裁判被预算掐断、见证与裁判分歧 —— 都红。
+      # 24 是 CI 的抽样量（本机 2026-09-28 实测 SAMPLES=24 时 72/72 张出货）；
+      # 重抄 band/budgetMs 要用 SAMPLES=60。
+      - name: Balance gate (measured ladder, uniqueness, cost)
+        env:
+          SAMPLES: "24"
+        run: node tools/balance.mjs
+
+      # 浏览器 job 现在**没有**，这是刻意的：阶段一只交引擎与度量闸，占位 UI 没有任何
+      # 交互承诺可验。阶段二连同 tools/verify.sh 一起落地，届时必须覆盖两种 URL 形态 ——
+      # `http://127.0.0.1:5321/`（本地 server.cjs）与 Pages 的子路径
+      # `https://<org>.github.io/z-biz-game-zebra-cos/`，只验前者会让 Pages 上的相对路径
+      # 问题一路绿到生产。预留端口：web 5321 / CDP 9321。
