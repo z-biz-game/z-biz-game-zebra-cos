@@ -80,8 +80,12 @@ function hasSDR(items, dom) {
  * 铅笔求解。
  * @param N 类别数/房子数
  * @param clues 题面
- * @param opts {rules=BASIC..FULL 的子集}
- * @returns {dom, solved, dead, undecided, fire, rounds, used}
+ * @param opts {rules=BASIC..FULL 的子集, trace=false}
+ *   trace=true 时额外交出 trace：每次真实删除一条 {rule,item,from,to,removed,why}，
+ *   按发生次序。它是**读出来的一份账**：不开时一个字节都不多算，开了也不改 dom/fire/rounds
+ *   中任何一个数（tools/verify.sh 的 hint 场景就断言这两件事）。提示文案用它，所以提示说的
+ *   每一格都是这条通道真的删过的格子，而不是答案。
+ * @returns {dom, solved, dead, undecided, fire, rounds, used, trace?}
  *   dead=true 表示推出矛盾（题面本身无解）—— 对唯一盘不可能出现，出现即 generator bug。
  */
 export function solve(N, clues, opts = {}) {
@@ -92,26 +96,33 @@ export function solve(N, clues, opts = {}) {
   const dom = new Uint32Array(n).fill(FULL);
   const fire = Object.fromEntries(RULE_ORDER.map((r) => [r, 0]));
   let dead = false;
+  // trace 只在调用方要的时候才建；why 是"这一次删除的理由"（线索下标 / 类别 / 假设的物品+房子）。
+  const trace = opts.trace ? [] : null;
+  let why = null;
 
   // 一次删除：记在规则名下。删空 ⇒ 矛盾。
   function cut(v, nd, rule) {
     nd &= FULL;
     if (dead || nd === dom[v]) return;
+    if (trace) trace.push({ rule, item: v, from: dom[v], to: nd, removed: dom[v] & ~nd, why });
     if (!nd) { dead = true; fire[rule] += POP[dom[v]]; return; }
     fire[rule] += POP[dom[v] & ~nd];
     dom[v] = nd;
   }
 
   // P1：一元线索开局就吃完（它不需要任何推理，是题面直接给的）
-  if (on('P1')) for (const c of clues) {
+  if (on('P1')) for (let ci = 0; ci < clues.length; ci++) {
+    const c = clues[ci];
+    if (trace) why = { clue: ci };
     if (c.k === 'at') cut(c.a, 1 << c.p, 'P1');
     else if (c.k === 'not') cut(c.a, ~(1 << c.p), 'P1');
   }
 
   const bin = [];
-  for (const c of clues) {
+  for (let ci = 0; ci < clues.length; ci++) {
+    const c = clues[ci];
     if (UNARY_KINDS.has(c.k)) continue;
-    bin.push({ c, key: relKey(c), t: supports(N, relKey(c)) });
+    bin.push({ c, idx: ci, key: relKey(c), t: supports(N, relKey(c)) });
   }
 
   let rounds = 0;
@@ -120,8 +131,9 @@ export function solve(N, clues, opts = {}) {
     const before = dom.slice();
 
     // P3 / P4：一条线索两端各看一次，另一端已定 ⇒ P3，否则 P4
-    for (const { c, key, t } of bin) {
+    for (const { c, key, t, idx } of bin) {
       const [ta, tb] = t;
+      if (trace) why = { clue: idx };
       const aPinned = POP[dom[c.a]] === 1, bPinned = POP[dom[c.b]] === 1;
       if (bPinned && !on('P3')) continue;
       if (!bPinned && !on('P4')) continue;
@@ -137,6 +149,7 @@ export function solve(N, clues, opts = {}) {
 
     // P2 / P5：类别内定值传播 + 房位容量
     for (const items of cats) {
+      if (trace) why = { cat: catOf(items[0], N) };
       for (;;) {
         let local = false, used = 0;
         for (const v of items) if (POP[dom[v]] === 1) used |= dom[v];
@@ -162,6 +175,7 @@ export function solve(N, clues, opts = {}) {
     // P6 / P7：类别内的 Hall 组（显性/隐性数组）
     if (on('P6') || on('P7')) {
       for (const items of cats) {
+        if (trace) why = { cat: catOf(items[0], N) };
         const top = 1 << items.length;
         for (let m = 1; m < top; m++) {
           const cnt = POP[m];
@@ -218,7 +232,11 @@ export function solve(N, clues, opts = {}) {
             if (bad) break;
             if (!hasSDR(items, probe)) { bad = true; break; }
           }
-          if (bad) { cut(v, dom[v] & ~(1 << h), 'P8'); if (dead) break outer; }
+          if (bad) {
+            if (trace) why = { probe: [v, h] };
+            cut(v, dom[v] & ~(1 << h), 'P8');
+            if (dead) break outer;
+          }
         }
       }
     }
@@ -231,7 +249,9 @@ export function solve(N, clues, opts = {}) {
 
   let undecided = 0;
   for (let i = 0; i < n; i++) if (POP[dom[i]] !== 1) undecided++;
-  return { dom, solved: !dead && undecided === 0, dead, undecided, fire, rounds, used: rules.join('+') };
+  const out = { dom, solved: !dead && undecided === 0, dead, undecided, fire, rounds, used: rules.join('+') };
+  if (trace) out.trace = trace;
+  return out;
 }
 
 /**

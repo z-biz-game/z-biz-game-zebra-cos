@@ -256,6 +256,6 @@ for (const { tier, suggest } of ROWS) {
   if (!suggest) continue;
   console.log(`  ${tier.key}: band [${tier.band.join(', ')}] → 建议 [${suggest.band.join(', ')}] · budgetMs ${tier.budgetMs} → 建议 ${suggest.budgetMs}`);
 }
-console.log(`  口径：band 取 draws/盘 的中位与 p95；budgetMs 取裁判 p95 的 25 倍向上取整到 10 ms。**都不取中位×2**。`);
+console.log(`  口径：band = [max(1, floor(中位×0.4)), max(lo+1, ceil(p95×1.6))]；budgetMs = 生产路径单次裁判 p95 × 4 向上取整到 10 ms（下限 10 ms）。**都不取中位×2**。`);
 console.log(`\nRESULT balance ok=${red === 0} tiers=${ROWS.length} boards=${ROWS.reduce((a, r) => a + r.boards.length, 0)} reds=${red}`);
 process.exit(red ? 1 : 0);

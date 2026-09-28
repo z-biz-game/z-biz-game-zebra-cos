@@ -23,7 +23,11 @@
 // ~8 ms/盘（2026-09-28 重跑），贵的一半在生成而不是验证 —— 所以第 3 步的池子规模是
 // 一个需要按实测压小的旋钮（poolTarget），不是一个"越全越好"的默认值。
 
-import { performance } from 'node:perf_hooks';
+// 这里**不**写 `import { performance } from 'node:perf_hooks'`：`node:` 前缀的说明符在浏览器里
+// 解不开，整个模块图会在第一条语句上死掉（阶段一的占位页正是这个死法，2026-09-28 用真 Chrome
+// 复现，见 docs/DESIGN.md §12）。`performance` 在 node ≥16 与浏览器都是全局，同一个钟、同一个
+// performance.now()，所以 ms 读数与换行之前同源 —— 少一行 import 不是放宽口径，是让这段口径
+// 真的能在浏览器里被执行一次。
 import { makeRng, seedOf } from './rng.js';
 import { CLUE_KINDS, catOf, checkSolution, itemIds } from './rules.js';
 import { countSolutions, provesUnique } from './counter.js';

@@ -68,8 +68,41 @@ jobs:
           SAMPLES: "24"
         run: node tools/balance.mjs
 
-      # 浏览器 job 现在**没有**，这是刻意的：阶段一只交引擎与度量闸，占位 UI 没有任何
-      # 交互承诺可验。阶段二连同 tools/verify.sh 一起落地，届时必须覆盖两种 URL 形态 ——
-      # `http://127.0.0.1:5321/`（本地 server.cjs）与 Pages 的子路径
-      # `https://<org>.github.io/z-biz-game-zebra-cos/`，只验前者会让 Pages 上的相对路径
-      # 问题一路绿到生产。预留端口：web 5321 / CDP 9321。
+  # 阶段二的第五道闸（前四道是 rule-test / counter-test / pencil-test / balance）：真 headless Chrome、
+  # 真 DOM、真画布像素、真 localStorage、真指针与真焦点。
+  # 它跑**两种 URL 形态**（tools/verify.sh:3-7）：仓库自己当文档根的 root 形态，和 Pages 的
+  # `/<repo>/` 前缀形态（verify.sh:16-20 写着为什么只有后者看得见页级 `/js/...` 说明符解到域名根上）。
+  # 本机实跑 2026-09-28（Chrome 154.0.8037.57 · node v26.8.1 · loadavg 起 { 9.60 7.91 5.84 }）：
+  # root 15/15 段 · 413 checks · 0 failed · 15 s ⇒ prefix 15/15 · 413 · 0 failed · 14 s ——
+  # 15 段 = 12 段注册场景 + urlseed 三趟，少一段交回结果 verify.sh 就判红
+  # （verify.sh:107 的 WANT_N 是注册表决定的，不是"跑完了就算"）。
+  browser:
+    name: real browser gate (both URL shapes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        # 22，不是上面 check job 用的 20：tools/playtest.cjs 是裸 CDP 驱动，用的 node 全局
+        # WebSocket/fetch（playtest.cjs:1 头上那句、:81 的 /json/version、:93 的 webSocketDebuggerUrl）
+        # 只在 node ≥22 存在。20 上第一条 attach 就 "WebSocket is not defined"，在第一条断言
+        # 之前整个 job 就红了 —— 那种红和这个游戏没有任何关系。
+        with:
+          node-version: 22
+      # ubuntu-latest 的镜像自带 google-chrome 并在 PATH 上，正是 verify.sh 在两条 macOS bundle
+      # 路径之后找的那个名字（verify.sh:54-60）。**不装**：pinned 镜像上的 apt/dpkg 是一次网络抖动
+      # 的来源，一旦它死了，读数会被读成"游戏坏了"而其实改动一行都没碰游戏。
+      # python3 是 verify.sh 自己要求的（结果解析 + 前缀形态的静态服务器，verify.sh:61），
+      # ubuntu-latest 也自带。
+      #
+      # 不要加 --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader：这个闸有一半的
+      # 断言在把画布像素读回来（深色像素计数、✗ 的棕色墨 #6b4a2f、提示高亮的红/绿调、逐位相同的
+      # 撤销对账），软件光栅化会让这些读数说谎（verify.sh:31-33）。
+      # 窄屏那一腿（390×844）用 Emulation.setDeviceMetricsOverride 在第一次导航之前钉住视口，
+      # 是 CDP 层的覆盖 ⇒ 不需要 xorg、不需要窗口管理器。
+      - name: Browser gate (root + prefix)
+        env:
+          # verify.sh 自己的看门狗默认值。本机两形态合计 ~27 s，这里是共享 runner 的余量，
+          # 不是闸用来打分的预算：把它调大不会让一条红的闸变绿，只能让看门狗别砍掉一条只是慢的跑。
+          WD_TIMEOUT: 900
+        run: bash tools/verify.sh
+

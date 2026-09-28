@@ -3,37 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>谁养鱼 ZEBRA · 阶段一占位</title>
+<title>谁养鱼 ZEBRA · 逻辑格</title>
+<!-- 空 favicon：不给浏览器留一个必然 404 的请求，免得闸的 console 噪音盖掉真错误 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'/%3E">
 <link rel="stylesheet" href="css/game.css">
 </head>
 <body>
   <header>
     <h1>谁养鱼 <small>ZEBRA · 逻辑格</small></h1>
-    <p class="stage">阶段一：引擎与度量闸。<b>这里只有出题与题面渲染，没有铅笔注记、没有提示、没有关卡包</b> —— 交互在阶段二落地。</p>
+    <p class="stage">纸笔交互：类别对上打 ✓/✗，最后把<b>分配</b>写进答案面板交给规则裁判。
+      每一盘都由 seed 现算，页面里<b>没有答案字段</b>，提示只念铅笔规则自己删掉的那些格。</p>
   </header>
 
   <main>
-    <section class="controls">
+    <section class="controls" id="controls">
       <label>档位
         <select id="tier"></select>
       </label>
       <label>盘号
-        <input id="seed" type="text" value="0" spellcheck="false" maxlength="24">
+        <input id="seed" type="text" value="b0" spellcheck="false" maxlength="24" aria-label="盘号 seed">
       </label>
-      <button id="next" type="button">下一盘</button>
+      <button id="btn-next" type="button">换一局</button>
+      <button id="btn-hint" type="button">提示</button>
+      <button id="btn-undo" type="button">撤销</button>
+      <button id="btn-clear" type="button">清空注记</button>
+      <span class="readouts">
+        <span id="stat-steps" class="stat">0 手</span>
+        <span id="stat-marks" class="stat">✗ 0 · ✓ 0</span>
+        <span id="stat-conflict" class="stat"></span>
+      </span>
       <span id="status" class="status"></span>
     </section>
 
-    <section class="board">
-      <canvas id="grid" width="560" height="360" aria-label="逻辑格与房子">此游戏需要支持 canvas 的浏览器。</canvas>
+    <section class="board-wrap" id="board-wrap">
+      <nav class="pairs" id="pairs" aria-label="类别对"></nav>
+      <div class="canvas-wrap">
+        <canvas id="grid" width="420" height="360" tabindex="0"
+                aria-label="逻辑格：行与列各是一个类别的物品，点一下在 空/✗/✓ 之间循环">此游戏需要支持 canvas 的浏览器。</canvas>
+      </div>
+      <p class="kbd">键盘：<kbd>←↑→↓</kbd> 移动光标 · <kbd>x</kbd> 划掉 · <kbd>o</kbd> 打勾 · <kbd>空格</kbd> 循环 · <kbd>⌫</kbd> 清空 · <kbd>[</kbd> <kbd>]</kbd> 换类别对</p>
+      <p id="hint" class="hint" role="status"></p>
     </section>
 
-    <section class="clues">
-      <h2>题面</h2>
+    <section class="side">
+      <h2 id="clue-head">题面</h2>
       <ol id="cluelist"></ol>
-      <h2>出货回执（引擎自己记的账）</h2>
+      <p id="question" class="question"></p>
+
+      <h2>这一盘的来历（引擎自己记的账）</h2>
       <pre id="receipt"></pre>
     </section>
+
+    <section class="answer" id="answer">
+      <h2>我的分配（答案面板）</h2>
+      <p class="note">每间房子在每个类别上填一个值；填完按「校验我的分配」。
+        判分问的是<b>你说的这组分配是否满足全部线索</b>，读的是 <code>rules.checkSolution</code>。</p>
+      <div id="answer-grid"></div>
+      <button id="btn-judge" type="button">校验我的分配</button>
+      <p id="verdict" class="verdict" hidden></p>
+    </section>
+
+    <section class="reject" id="reject" hidden>
+      <h2>本盘未通过验收</h2>
+      <pre id="reject-detail"></pre>
+    </section>
+
+    <footer>
+      <p id="save-note" class="save-note"></p>
+    </footer>
   </main>
 
   <script type="module" src="js/main.js"></script>
