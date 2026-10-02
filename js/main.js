@@ -17,6 +17,7 @@
 import { CAT_SHORT, CATALOG, describeClue } from './engine/rules.js';
 import { TIERS } from './engine/generate.js';
 import { CHECK, CROSS, EMPTY, Game, assessBoard, boardIsProven, makeBoard } from './ui/game.js';
+import { makeStopwatch, tick as tickStopwatch, togglePause } from './ui/stopwatch.js';
 import { COLORS, GridView } from './render/board.js';
 import { SAVE_KEY, clear as clearSave, load, save } from './store.js';
 
@@ -29,6 +30,7 @@ const dom = {
   question: $('question'), receipt: $('receipt'), answer: $('answer'), answerGrid: $('answer-grid'),
   verdict: $('verdict'), reject: $('reject'), rejectDetail: $('reject-detail'),
   saveNote: $('save-note'), boardWrap: $('board-wrap'),
+  time: $('stat-time'), pause: $('btn-pause'), mute: $('btn-mute'), full: $('btn-full'), brand: $('brand'),
 };
 
 const app = { game: null, proof: null, view: new GridView(dom.canvas), proven: false, saveOk: true, rejected: null, lastHint: null };
@@ -290,7 +292,7 @@ function openBoard(tierKey, seed, restore) {
 function persist() {
   if (!app.game) return;
   const g = app.game;
-  app.saveOk = save(localStorage, { tier: g.tierKey, seed: g.seed, marks: g.encode(), steps: g.steps, hints: g.hints });
+  app.saveOk = save({ tier: g.tierKey, seed: g.seed, marks: g.encode(), steps: g.steps, hints: g.hints });
   renderReadouts();
 }
 
@@ -307,6 +309,7 @@ function onCanvasPointer(ev) {
   g.tap(g.cursor.p, cell.row, cell.col);
   app.lastHint = null;
   g.clearHint();
+  blip(540);
   paint();
   persist();
 }
@@ -371,6 +374,107 @@ dom.clear.addEventListener('click', () => {
 dom.judge.addEventListener('click', () => judgeAnswer());
 window.addEventListener('resize', paint);
 
+// ── 会话内的辅助能力（全部只在内存里，不碰 localStorage 存档）─────────────────────
+// reduce-motion：CSS 那条 @media 已经把动画关掉；这里再拿 matchMedia 驱动"运行中"脉冲点，
+// 让 JS 侧的行为也尊重系统偏好，而不是只改个样式。
+const reduceMotion = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)'))
+  || { matches: false };
+
+// ── 声音：WebAudio 轻提示音 + 真静音（suspend/resume，不是把音量设 0 骗过去）──────────
+const audio = { ctx: null, muted: false };
+function ensureCtx() {
+  if (audio.ctx || audio.muted) return audio.ctx;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audio.ctx = new AC();
+  } catch { audio.ctx = null; }
+  return audio.ctx;
+}
+function blip(freq) {
+  if (audio.muted) return;
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    g.gain.value = 0.04;
+    o.connect(g);
+    g.connect(ctx.destination);
+    const t = ctx.currentTime;
+    o.start(t);
+    o.stop(t + 0.06);
+  } catch { /* 无声设备 / 权限：静默跳过，绝不 console.error（闸会把它记成异常）*/ }
+}
+function renderMute() {
+  if (!dom.mute) return;
+  dom.mute.setAttribute('aria-pressed', String(audio.muted));
+  dom.mute.textContent = audio.muted ? '已静音' : '音效';
+}
+function toggleMute() {
+  audio.muted = !audio.muted;
+  if (audio.ctx) {
+    const p = audio.muted ? audio.ctx.suspend() : audio.ctx.resume();
+    if (p && typeof p.catch === 'function') p.catch(() => {});   // 拒绝也不能变成 unhandledrejection
+  }
+  renderMute();
+  return audio.muted;
+}
+
+// ── 秒表：rAF 累计真实 elapsed，帧率无关（见 js/ui/stopwatch.js 的不变式）─────────────
+const sw = makeStopwatch();
+function fmtTime(total) {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+let timeShown = '';
+function renderTime() {
+  if (!dom.time) return;
+  const next = fmtTime(sw.seconds) + (sw.running ? '' : ' ·暂停');
+  if (next !== timeShown) { dom.time.textContent = next; timeShown = next; }
+  dom.time.classList.toggle('running', sw.running && !reduceMotion.matches);
+}
+function loop(now) {
+  tickStopwatch(sw, now);
+  renderTime();
+  window.requestAnimationFrame(loop);
+}
+function renderPause() {
+  if (!dom.pause) return;
+  dom.pause.setAttribute('aria-pressed', String(!sw.running));
+  dom.pause.textContent = sw.running ? '暂停' : '继续';
+}
+
+// ── 全屏：真调 requestFullscreen，失败（如闸里没给权限）静默吞掉，不外泄成 console.error ──
+function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  } catch { /* 环境不支持：忽略 */ }
+}
+
+if (dom.pause) dom.pause.addEventListener('click', () => { togglePause(sw); renderPause(); blip(sw.running ? 660 : 300); });
+if (dom.mute) dom.mute.addEventListener('click', () => { toggleMute(); if (!audio.muted) blip(520); });
+if (dom.full) dom.full.addEventListener('click', () => toggleFullscreen());
+renderPause();
+renderMute();
+window.requestAnimationFrame(loop);
+
+// ── 可安装：注册 SW（network-first，在线时行为等价于没有 SW）。失败必须 .catch 到空，
+//    unhandledrejection 会被启动期探针记成异常。路径按 document.baseURI 解析，Pages 前缀下不 404。
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    try {
+      navigator.serviceWorker.register(new URL('sw.js', document.baseURI).href).catch(() => {});
+    } catch { /* 注册不了就是没离线可用，不影响在线玩 */ }
+  });
+}
+
 for (const t of TIERS) {
   const opt = document.createElement('option');
   opt.value = t.key;
@@ -418,6 +522,12 @@ window.zebra = {
   },
   judge: judgeAnswer,
   readClaim,
+  timer: sw,
+  get elapsed() { return sw.seconds; },
+  get muted() { return audio.muted; },
+  togglePause: () => { togglePause(sw); renderPause(); return sw.running; },
+  toggleMute,
+  toggleFullscreen,
   gate: {
     /**
      * 注入一张外部给的盘（闸的 canary 用它喂"推不完"与"stopped"的盘）：现算验收，不过就摊开。

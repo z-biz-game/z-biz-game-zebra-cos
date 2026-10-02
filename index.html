@@ -2,14 +2,24 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>谁养鱼 ZEBRA · 逻辑格</title>
-<!-- 空 favicon：不给浏览器留一个必然 404 的请求，免得闸的 console 噪音盖掉真错误 -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'/%3E">
+<meta name="description" content="纸笔逻辑格推理：谁养鱼 ZEBRA。每一盘都由 seed 现算，在类别交叉格打勾或划叉逐步排除，最后把分配交给规则裁判判定。">
+<meta name="theme-color" content="#fbf8f2">
+<meta name="color-scheme" content="light">
+<meta property="og:type" content="website">
+<meta property="og:title" content="谁养鱼 ZEBRA · 逻辑格">
+<meta property="og:description" content="seed 现算的唯一题面，纸笔逻辑格推理。">
+<meta property="og:image" content="assets/og-card.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="css/game.css">
 </head>
 <body>
   <header>
+    <img id="brand" class="brand" src="assets/sprite-zebra-fish.png" width="56" height="56" alt="谁养鱼 ZEBRA 品牌图：纸面逻辑格与一条鱼">
     <h1>谁养鱼 <small>ZEBRA · 逻辑格</small></h1>
     <p class="stage">纸笔交互：类别对上打 ✓/✗，最后把<b>分配</b>写进答案面板交给规则裁判。
       每一盘都由 seed 现算，页面里<b>没有答案字段</b>，提示只念铅笔规则自己删掉的那些格。</p>
@@ -27,9 +37,13 @@
       <button id="btn-hint" type="button">提示</button>
       <button id="btn-undo" type="button">撤销</button>
       <button id="btn-clear" type="button">清空注记</button>
+      <button id="btn-pause" type="button" aria-pressed="false">暂停</button>
+      <button id="btn-mute" type="button" aria-pressed="false">音效</button>
+      <button id="btn-full" type="button">全屏</button>
       <span class="readouts">
         <span id="stat-steps" class="stat">0 手</span>
         <span id="stat-marks" class="stat">✗ 0 · ✓ 0</span>
+        <span id="stat-time" class="stat">00:00</span>
         <span id="stat-conflict" class="stat"></span>
       </span>
       <span id="status" class="status"></span>

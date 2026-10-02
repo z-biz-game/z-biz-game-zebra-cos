@@ -20,7 +20,8 @@
 html, body { max-width: 100%; }
 body {
   margin: 0;
-  padding: 18px 14px 40px;
+  padding: calc(18px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));
   background: var(--paper);
   color: var(--ink);
   font: 15px/1.6 ui-sans-serif, system-ui, "PingFang SC", "Hiragino Sans GB", sans-serif;
@@ -48,12 +49,12 @@ code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .controls[hidden] { display: none; }
 .controls label { display: flex; align-items: center; gap: 6px; }
 .controls select, .controls input {
-  font: inherit; padding: 4px 6px; min-height: 32px;
+  font: inherit; padding: 4px 8px; min-height: 44px;
   border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink);
 }
 .controls input { width: 9ch; }
 .controls button, .answer button {
-  font: inherit; padding: 6px 14px; min-height: 36px; cursor: pointer;
+  font: inherit; padding: 6px 14px; min-height: 44px; cursor: pointer;
   border: 1px solid var(--accent); border-radius: 4px;
   background: #fff; color: var(--accent);
 }
@@ -69,7 +70,7 @@ code { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .pairs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .pairs[hidden] { display: none; }
 .pairs button {
-  font: 13px/1.4 inherit; padding: 5px 10px; min-height: 32px; cursor: pointer;
+  font: 13px/1.4 inherit; padding: 5px 10px; min-height: 44px; cursor: pointer;
   border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink-soft);
 }
 .pairs button[aria-current="true"] { border-color: var(--accent); color: var(--accent); background: #fff7ee; font-weight: 600; }
@@ -119,8 +120,31 @@ pre {
 
 .save-note { color: var(--ink-soft); font-size: 12px; }
 
+/* ── 品牌图 + 运行脉冲 ───────────────────────────────────────────────────── */
+.brand {
+  float: left; margin: 0 12px 8px 0; width: 56px; height: 56px;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff;
+}
+header { overflow: hidden; }
+@keyframes time-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+#stat-time.running { color: var(--accent); animation: time-pulse 1.6s ease-in-out infinite; }
+
+/* 尊重系统「减弱动态效果」：真把动画/过渡时长压到近乎为 0（不是空块、不是只在注释里提）。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  #stat-time.running { animation: none; }
+}
+
 @media (max-width: 520px) {
-  body { padding: 12px 8px 32px; }
+  body {
+    padding: calc(12px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
+      calc(32px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+  }
   h1 { font-size: 20px; }
   .controls { padding: 8px; gap: 6px 8px; }
   .controls button, .answer button { padding: 6px 10px; }

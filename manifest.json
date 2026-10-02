@@ -1,0 +1,17 @@
+{
+  "name": "谁养鱼 ZEBRA · 逻辑格",
+  "short_name": "谁养鱼",
+  "description": "纸笔逻辑格推理：谁养鱼 ZEBRA。每一盘都由 seed 现算，在类别交叉格打勾或划叉逐步排除，最后把分配交给规则裁判判定。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbf8f2",
+  "theme_color": "#fbf8f2",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

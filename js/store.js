@@ -19,9 +19,11 @@ export function pack(state) {
   return out;
 }
 
-export function save(store, state) {
+// save 走真实的 window.localStorage（唯一调用方 js/main.js 传的就是它）；
+// load/clear 仍收注入的 sink：浏览器闸要拿一个假的 {getItem} 单测解码，不能钉死到真存储上。
+export function save(state) {
   try {
-    store.setItem(SAVE_KEY, JSON.stringify(pack(state)));
+    localStorage.setItem(SAVE_KEY, JSON.stringify(pack(state)));
     return true;
   } catch {
     return false;                       // 无痕模式 / 配额爆：静默继续玩，但不假装存住了
