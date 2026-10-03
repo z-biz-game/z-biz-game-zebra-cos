@@ -9,7 +9,9 @@
     "dev": "node server.cjs 5321",
     "test": "node --test test/ && node tools/rule-test.mjs && node tools/counter-test.mjs && node tools/pencil-test.mjs",
     "balance": "node tools/balance.mjs",
-    "check": "for f in $(find js tools test -name '*.js' -o -name '*.mjs'); do node --check \"$f\" || exit 1; done && node --check server.cjs && echo OK"
+    "check": "for f in $(find js tools test -name '*.js' -o -name '*.mjs'); do node --check \"$f\" || exit 1; done && node --check server.cjs && echo OK",
+    "deploy-set": "node tools/deploy-set.mjs",
+    "deploy-set:selftest": "node tools/deploy-set-selftest.mjs"
   },
   "keywords": ["game", "puzzle", "zebra", "logic-grid", "csp", "nikoli", "procedural", "web"],
   "author": "z-biz-game",
