@@ -113,6 +113,11 @@ WANT_N=$(( $(echo ${SCENARIOS:-$SCENARIOS_DONE} | wc -w | tr -d ' ') + 3 ))
 # 就是浏览器加载的那批 js/ 模块），红了读作"页面与 node 不再是同一批盘"。
 echo "=== node re-derives the fixture pinned in tools/scenarios.js ==="
 node tools/fixtures.mjs --check || FAILED=1
+# 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑（59 仓同形）。「本地全绿、线上 404 自己的
+# manifest / sw.js / 图标」这一类坏法缺的就是这一步。它不碰 Chrome，所以放在浏览器腿之前。
+echo "=== deploy-set ==="
+node tools/deploy-set.mjs || FAILED=1
+node tools/deploy-set-selftest.mjs || FAILED=1
 
 # ---- machine-readable RESULT line ----------------------------------------------------------------
 # playtest.cjs 把 RESULT 打在 stdout 最后一行、console 噪音留在 stderr。这里不数行数就不叫跑过：
