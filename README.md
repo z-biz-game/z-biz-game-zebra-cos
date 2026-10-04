@@ -143,7 +143,7 @@ js/render/board.js      画布几何 + 命中（cellRect/cellAt/hitRadius）与�
 js/store.js             zebra.save.v1 一个键：字段白名单、坏档一律当没有、ANSWERISH 单点定义
 js/main.js              入口：开盘、渲染、真指针与键盘、答案面板判分、验收不过就摊开 #reject
 server.cjs              只给闸用的静态服务器（仓库=文档根）
-tools/rule-test.mjs     词汇表/语义/支撑表闸（1353 项） / tools/assemble-site / tools/deploy-set / tools/deploy-set-selftest
+tools/rule-test.mjs     词汇表/语义/支撑表闸（1353 项）
 tools/counter-test.mjs  裁判 vs 见证、stopped 语义、单调性闸（285 项）
 tools/pencil-test.mjs   铅笔 soundness/完备性/能力上界/负对照闸（31 项）
 tools/balance.mjs       难度实测台：出货、唯一、不可约、成本、阶梯、红线
