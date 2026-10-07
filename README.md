@@ -8,7 +8,7 @@
 `zebra.save.v1` 一个键的存档。下面每个数字都来自本机跑过的一条命令，命令就写在数字旁边。
 
 ```
-node --test test/                    tests 29 · pass 29 · fail 0        （2026-09-28，node v26.8.1）
+node --test test/*.test.mjs           tests 29 · pass 29 · fail 0        （2026-10-07，node v26.8.1）
 node tools/rule-test.mjs             RESULT rule-test ok=true checks=1353 fails=0
 node tools/counter-test.mjs          RESULT counter-test ok=true checks=285 fails=0
 node tools/pencil-test.mjs           RESULT pencil-test ok=true checks=31 fails=0
@@ -104,13 +104,19 @@ loadavg 6.4/5.1/3.4 ⇒ 墙钟那三列只当上界读；判定用的 p95 与前
 
 ```
 node server.cjs               # http://127.0.0.1:5321/  （端口预留：web 5321 / CDP 9321 / Pages 前缀形态 5421）
-node --test test/             # 单元测试
+node --test test/*.test.mjs   # 单元测试
 node tools/balance.mjs        # 难度实测台（默认 SAMPLES=12；重抄 band 用 SAMPLES=60）
 bash tools/verify.sh          # 第五道闸：两种 URL 形态 × 12 段场景 + urlseed 三趟
 SHAPES=root bash tools/verify.sh          # 改东西时先只跑一种形态（本机 root 一跑 ~15 s）
 SCENARIOS="boot canary" bash tools/verify.sh
 BASE_URL=https://z-biz-game.github.io/z-biz-game-zebra-cos/ bash tools/verify.sh   # 部署件，不起服务
 ```
+
+单测那条为什么写文件列表而不是目录：`node --test test/` 里「`test/` 展开成哪些文件」是 test runner
+按 node 版本各自的规则决定的，本仓的 `check` job 在 node 20、`browser` job 在 node 22、开发机是 v26.8.1，
+同一句话在三个地方可能圈出不同的集合。写成 `test/*.test.mjs` 后由 shell 展开，三个 node 拿到的是同一份
+四个文件的列表。本轮两种写法在本机实测都是 `tests 29 / pass 29 / fail 0`（不是改前坏了，是把「赌目录规则」
+这件事从闸里拿掉）。CI 的那一步与 `npm test` 的第一条现在字节相同。
 
 零运行时依赖、零构建步骤、`js/` 全是 ES module、没有图片与音频文件。浏览器闸的驱动是
 `tools/playtest.cjs`（裸 CDP，用 node 全局 `WebSocket`/`fetch` ⇒ 需要 node ≥ 22），它不需要窗口管理器：

@@ -40,11 +40,12 @@ jobs:
           grep -q './engine/generate.js' js/main.js
 
       #  unit tests：改动时最想立刻看见的那几条（每种线索的语义、stopped 的读法、跨进程复现）。
+      #  文件列表由 shell 展开，不交给 test runner 去猜目录——那套展开规则是 node 版本的事。
       - name: Unit tests (node --test)
-        run: node --test test/
+        run: node --test test/*.test.mjs
 
       # 三道定义闸。数字是契约：rule-test 1353 / counter-test 285 / pencil-test 31（本机
-      # 2026-09-28 实跑），红了先读 Reason 行，不要去看退出码就好。
+      # 2026-10-07 复跑同值），红了先读 Reason 行，不要去看退出码就好。
       - name: Rule tests (legal-board definition, 11 clue kinds pinned twice)
         run: node tools/rule-test.mjs
 
