@@ -9,7 +9,7 @@
 
 ```
 node --test test/*.test.mjs           tests 30 · pass 30 · fail 0        （2026-10-08，node v26.8.1）
-node test/docs.test.mjs               RESULT docs-test ok=true checks=9 fails=0
+node test/docs.test.mjs               RESULT docs-test ok=true checks=15 fails=0
 node tools/rule-test.mjs             RESULT rule-test ok=true checks=1353 fails=0
 node tools/counter-test.mjs          RESULT counter-test ok=true checks=285 fails=0
 node tools/pencil-test.mjs           RESULT pencil-test ok=true checks=31 fails=0
@@ -148,7 +148,9 @@ D6 一记（把一条完整引用改成只有冒号加数字、且前面借不�
 "只挑仓根那一份"）。
 
 本轮读数（2026-10-08，本机 node v26.8.1 一次 `node test/docs.test.mjs`）：2 份文档 · 21 条引用 ·
-6 条带指认 · 0 条续引 · 0 条跨仓，`rows: 9 fail: 0`。
+6 条带指认 · 0 条续引 · 0 条跨仓 · 文档行号对账 15 条判据，`rows: 15 fail: 0`。这六个数不再是修辞：这条腿
+逐处对账，文档里凡印着这些标签的地方都必须等于本轮实数，**一处都没印同样要红**（D10 抄写台账；三把只动文档、
+代码一行不碰的刀在带 `.git` 的副本上各红一次并点名对应标签，跑完树复原）。
 
 ## 线索词汇表
 
