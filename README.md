@@ -8,7 +8,8 @@
 `zebra.save.v1` 一个键的存档。下面每个数字都来自本机跑过的一条命令，命令就写在数字旁边。
 
 ```
-node --test test/*.test.mjs           tests 29 · pass 29 · fail 0        （2026-10-07，node v26.8.1）
+node --test test/*.test.mjs           tests 30 · pass 30 · fail 0        （2026-10-08，node v26.8.1）
+node test/docs.test.mjs               RESULT docs-test ok=true checks=9 fails=0
 node tools/rule-test.mjs             RESULT rule-test ok=true checks=1353 fails=0
 node tools/counter-test.mjs          RESULT counter-test ok=true checks=285 fails=0
 node tools/pencil-test.mjs           RESULT pencil-test ok=true checks=31 fails=0
@@ -36,9 +37,9 @@ bash tools/verify.sh                 shape=root    15/15 段 · 413 checks · 0 
    （片段导航不算重载），换 seed 那一趟必须换盘且不续上一趟的注记。
 2. **页面里没有答案路径**：boot 拿 node 算出的真值去扫 `window.zebra` 的对象图（BFS，且断言要求
    "扫过的节点数 > 60"才认这条绿 —— 0 个节点的"扫过了"不算扫过）、
-   全部 DOM 属性与 `dataset`、`localStorage`，扫到即红；存档字段走 `js/store.js` 的白名单。
-3. **提示只念铅笔真的删过的那些格**：`js/engine/pencil.js` 的 `trace`（`solve(…, {trace:true})` 交回的
-   `{rule,item,from,to,removed,why}` 序列）是唯一来源，`js/ui/game.js` 的 `hintStep()` 用 dom 的交并把它
+   全部 DOM 属性与 `dataset`、`localStorage`，扫到即红；存档字段走 `js/store.js:12` 的 `SAVE_FIELDS` 白名单。
+3. **提示只念铅笔真的删过的那些格**：`js/engine/pencil.js:100` 的 `trace`（`solve(…, {trace:true})` 交回的
+   `{rule,item,from,to,removed,why}` 序列）是唯一来源，`js/ui/game.js:217` 的 `hintStep` 用 dom 的交并把它
    换算成"这一格可以划掉/打勾"。文案逐条对到 P1–P8 的规则名与 node 侧那三步的 cross/check 计数；
    某一步删不动任何格子时，画布上必须**一笔提示色都不画**（提示不代劳）。
    `trace` 不改引擎任何一个读数：12 张夹具盘逐个比对 trace 开与关的 `dom/fire/rounds/solved/undecided/used`
@@ -115,7 +116,7 @@ BASE_URL=https://z-biz-game.github.io/z-biz-game-zebra-cos/ bash tools/verify.sh
 单测那条为什么写文件列表而不是目录：`node --test test/` 里「`test/` 展开成哪些文件」是 test runner
 按 node 版本各自的规则决定的，本仓的 `check` job 在 node 20、`browser` job 在 node 22、开发机是 v26.8.1，
 同一句话在三个地方可能圈出不同的集合。写成 `test/*.test.mjs` 后由 shell 展开，三个 node 拿到的是同一份
-四个文件的列表。本轮两种写法在本机实测都是 `tests 29 / pass 29 / fail 0`（不是改前坏了，是把「赌目录规则」
+五个文件的列表。本轮两种写法在本机实测都是 `tests 30 / pass 30 / fail 0`（不是改前坏了，是把「赌目录规则」
 这件事从闸里拿掉）。CI 的那一步与 `npm test` 的第一条现在字节相同。
 
 零运行时依赖、零构建步骤、`js/` 全是 ES module、没有图片与音频文件。浏览器闸的驱动是
@@ -126,6 +127,28 @@ CI（`.github/workflows/ci.yml`）**不跑 npm install**，两个 job：`check`�
 `SAMPLES: "24"`）与 `browser`（node 22、`WD_TIMEOUT: 900`、`bash tools/verify.sh`）。
 `browser` 用 22 而不是 20 的理由写在那个 job 的注释里：node 20 上没有全局 `WebSocket`，
 第一条 CDP attach 就死在第一条断言之前。
+
+### 文档里的行号也在账上（`test/docs.test.mjs`）
+
+README 与 `docs/DESIGN.md` 里每个反引号包住的 `path:NN` 都被读回真文件对账：文件要在盘上、行号要落在
+真实行数内、被指的那几行不许整段是空行，而贴着引用的那个名字必须作为**完整标识符**出现在被指的行里
+（整词，不是子串 —— 短名字坐在长标识符那一行上也会"出现"）。跨仓引用只数不判。输入集当场从
+`git ls-files` 推，且**不限仓根**：本仓的 DESIGN 就住在 `docs/` 下，只挑仓根那一份会把样本从 2 份
+悄悄缩成 1 份，而读数照样绿。
+
+这一腿一到就点了两处名：DESIGN 有两条引用只写 basename 就接上行号（`balance.mjs` 那一支），在本仓的
+跟踪清单里解析不出路径，而它们说的其实是 `tools/` 下那一份；README 一条引用都没有（D2 红 —— 某份文档
+被跳过时这里红，而不是条数悄悄变少）。补与改的每条都读回真文件那一行再落笔。
+
+跑法：`npm test` 那条 `node --test test/*.test.mjs`；CI 的 `check` job 跑的是与它字节相同的同一条命令
+—— 那是接线，跑没跑到由那一次 run 的读数说。这条腿自己的破坏台账是五刀，跑在带 `.git` 的定稿树副本上
+（刀全是同行内联替换，不改行数——改了行数，被引用的那些行号自己就漂，红的是不相干的那一边）：D3 两记
+（行号越界、行号落在被引文件的一处真空行上）、D4 一记（把带指认的引用搬到同一文件里不含那个名字的行）、
+D6 一记（把一条完整引用改成只有冒号加数字、且前面借不到路径的形状）、再加 D1 一记（把输入集的推导缩回
+"只挑仓根那一份"）。
+
+本轮读数（2026-10-08，本机 node v26.8.1 一次 `node test/docs.test.mjs`）：2 份文档 · 21 条引用 ·
+6 条带指认 · 0 条续引 · 0 条跨仓，`rows: 9 fail: 0`。
 
 ## 线索词汇表
 
@@ -157,7 +180,7 @@ tools/fixtures.mjs      生成/重算浏览器里那 14 条夹具（verify.sh �
 tools/scenarios.js      13 段注册的断言本体（12 段固定 + urlseed 带查询串跑三趟；含夹具表）
 tools/playtest.cjs      裸 CDP 驱动（node ≥ 22）
 tools/verify.sh         第五道闸：两种 URL 形态、每腿一个新 Chrome profile、端口占用会打印谁在听
-test/                   node --test 单元测试（29 项）
+test/                   node --test 单元测试（30 项，含文档行号对账）
 docs/DESIGN.md          设计说明与被否决的写法
 ```
 
