@@ -8,7 +8,8 @@
 `zebra.save.v1` 一个键的存档。下面每个数字都来自本机跑过的一条命令，命令就写在数字旁边。
 
 ```
-node --test test/                    tests 29 · pass 29 · fail 0        （2026-09-28，node v26.8.1）
+node --test test/*.test.mjs           tests 30 · pass 30 · fail 0        （2026-10-08，node v26.8.1）
+node test/docs.test.mjs               RESULT docs-test ok=true checks=15 fails=0
 node tools/rule-test.mjs             RESULT rule-test ok=true checks=1353 fails=0
 node tools/counter-test.mjs          RESULT counter-test ok=true checks=285 fails=0
 node tools/pencil-test.mjs           RESULT pencil-test ok=true checks=31 fails=0
@@ -36,9 +37,9 @@ bash tools/verify.sh                 shape=root    15/15 段 · 413 checks · 0 
    （片段导航不算重载），换 seed 那一趟必须换盘且不续上一趟的注记。
 2. **页面里没有答案路径**：boot 拿 node 算出的真值去扫 `window.zebra` 的对象图（BFS，且断言要求
    "扫过的节点数 > 60"才认这条绿 —— 0 个节点的"扫过了"不算扫过）、
-   全部 DOM 属性与 `dataset`、`localStorage`，扫到即红；存档字段走 `js/store.js` 的白名单。
-3. **提示只念铅笔真的删过的那些格**：`js/engine/pencil.js` 的 `trace`（`solve(…, {trace:true})` 交回的
-   `{rule,item,from,to,removed,why}` 序列）是唯一来源，`js/ui/game.js` 的 `hintStep()` 用 dom 的交并把它
+   全部 DOM 属性与 `dataset`、`localStorage`，扫到即红；存档字段走 `js/store.js:12` 的 `SAVE_FIELDS` 白名单。
+3. **提示只念铅笔真的删过的那些格**：`js/engine/pencil.js:100` 的 `trace`（`solve(…, {trace:true})` 交回的
+   `{rule,item,from,to,removed,why}` 序列）是唯一来源，`js/ui/game.js:217` 的 `hintStep` 用 dom 的交并把它
    换算成"这一格可以划掉/打勾"。文案逐条对到 P1–P8 的规则名与 node 侧那三步的 cross/check 计数；
    某一步删不动任何格子时，画布上必须**一笔提示色都不画**（提示不代劳）。
    `trace` 不改引擎任何一个读数：12 张夹具盘逐个比对 trace 开与关的 `dom/fire/rounds/solved/undecided/used`
@@ -104,13 +105,19 @@ loadavg 6.4/5.1/3.4 ⇒ 墙钟那三列只当上界读；判定用的 p95 与前
 
 ```
 node server.cjs               # http://127.0.0.1:5321/  （端口预留：web 5321 / CDP 9321 / Pages 前缀形态 5421）
-node --test test/             # 单元测试
+node --test test/*.test.mjs   # 单元测试
 node tools/balance.mjs        # 难度实测台（默认 SAMPLES=12；重抄 band 用 SAMPLES=60）
 bash tools/verify.sh          # 第五道闸：两种 URL 形态 × 12 段场景 + urlseed 三趟
 SHAPES=root bash tools/verify.sh          # 改东西时先只跑一种形态（本机 root 一跑 ~15 s）
 SCENARIOS="boot canary" bash tools/verify.sh
 BASE_URL=https://z-biz-game.github.io/z-biz-game-zebra-cos/ bash tools/verify.sh   # 部署件，不起服务
 ```
+
+单测那条为什么写文件列表而不是目录：`node --test test/` 里「`test/` 展开成哪些文件」是 test runner
+按 node 版本各自的规则决定的，本仓的 `check` job 在 node 20、`browser` job 在 node 22、开发机是 v26.8.1，
+同一句话在三个地方可能圈出不同的集合。写成 `test/*.test.mjs` 后由 shell 展开，三个 node 拿到的是同一份
+五个文件的列表。本轮两种写法在本机实测都是 `tests 30 / pass 30 / fail 0`（不是改前坏了，是把「赌目录规则」
+这件事从闸里拿掉）。CI 的那一步与 `npm test` 的第一条现在字节相同。
 
 零运行时依赖、零构建步骤、`js/` 全是 ES module、没有图片与音频文件。浏览器闸的驱动是
 `tools/playtest.cjs`（裸 CDP，用 node 全局 `WebSocket`/`fetch` ⇒ 需要 node ≥ 22），它不需要窗口管理器：
@@ -120,6 +127,30 @@ CI（`.github/workflows/ci.yml`）**不跑 npm install**，两个 job：`check`�
 `SAMPLES: "24"`）与 `browser`（node 22、`WD_TIMEOUT: 900`、`bash tools/verify.sh`）。
 `browser` 用 22 而不是 20 的理由写在那个 job 的注释里：node 20 上没有全局 `WebSocket`，
 第一条 CDP attach 就死在第一条断言之前。
+
+### 文档里的行号也在账上（`test/docs.test.mjs`）
+
+README 与 `docs/DESIGN.md` 里每个反引号包住的 `path:NN` 都被读回真文件对账：文件要在盘上、行号要落在
+真实行数内、被指的那几行不许整段是空行，而贴着引用的那个名字必须作为**完整标识符**出现在被指的行里
+（整词，不是子串 —— 短名字坐在长标识符那一行上也会"出现"）。跨仓引用只数不判。输入集当场从
+`git ls-files` 推，且**不限仓根**：本仓的 DESIGN 就住在 `docs/` 下，只挑仓根那一份会把样本从 2 份
+悄悄缩成 1 份，而读数照样绿。
+
+这一腿一到就点了两处名：DESIGN 有两条引用只写 basename 就接上行号（`balance.mjs` 那一支），在本仓的
+跟踪清单里解析不出路径，而它们说的其实是 `tools/` 下那一份；README 一条引用都没有（D2 红 —— 某份文档
+被跳过时这里红，而不是条数悄悄变少）。补与改的每条都读回真文件那一行再落笔。
+
+跑法：`npm test` 那条 `node --test test/*.test.mjs`；CI 的 `check` job 跑的是与它字节相同的同一条命令
+—— 那是接线，跑没跑到由那一次 run 的读数说。这条腿自己的破坏台账是五刀，跑在带 `.git` 的定稿树副本上
+（刀全是同行内联替换，不改行数——改了行数，被引用的那些行号自己就漂，红的是不相干的那一边）：D3 两记
+（行号越界、行号落在被引文件的一处真空行上）、D4 一记（把带指认的引用搬到同一文件里不含那个名字的行）、
+D6 一记（把一条完整引用改成只有冒号加数字、且前面借不到路径的形状）、再加 D1 一记（把输入集的推导缩回
+"只挑仓根那一份"）。
+
+本轮读数（2026-10-08，本机 node v26.8.1 一次 `node test/docs.test.mjs`）：2 份文档 · 21 条引用 ·
+6 条带指认 · 0 条续引 · 0 条跨仓 · 文档行号对账 15 条判据，`rows: 15 fail: 0`。这六个数不再是修辞：这条腿
+逐处对账，文档里凡印着这些标签的地方都必须等于本轮实数，**一处都没印同样要红**（D10 抄写台账；三把只动文档、
+代码一行不碰的刀在带 `.git` 的副本上各红一次并点名对应标签，跑完树复原）。
 
 ## 线索词汇表
 
@@ -151,9 +182,58 @@ tools/fixtures.mjs      生成/重算浏览器里那 14 条夹具（verify.sh �
 tools/scenarios.js      13 段注册的断言本体（12 段固定 + urlseed 带查询串跑三趟；含夹具表）
 tools/playtest.cjs      裸 CDP 驱动（node ≥ 22）
 tools/verify.sh         第五道闸：两种 URL 形态、每腿一个新 Chrome profile、端口占用会打印谁在听
-test/                   node --test 单元测试（29 项）
+test/                   node --test 单元测试（30 项，含文档行号对账）
 docs/DESIGN.md          设计说明与被否决的写法
 ```
 
 出处核对日期：2026-09-28（Life International 1962-12-17 题面经 Wikipedia "Zebra puzzle" 词条核对；
+tools/assemble-site.sh  部署产物的唯一清单（pages.yml 与本地闸调同一支）
+tools/deploy-set.mjs  部署集闸：检查即将上传的那份产物
+tools/deploy-set-selftest.mjs  部署集闸的阴性自证（每一类断言当场打红一次）
 NP-完全性经 Quasigroup Completion，Sempolinski 2009）。
+
+## 上线的到底是哪一批文件
+
+这个仓没有打包器：站点=一次文件拷贝。以前「拷哪些」写在 `pages.yml` 的 `run:` 里（手抄的几行
+`cp`）。本地 `index.html` 直读仓库根，永远自洽；线上却按那份清单拷，于是页面后来引用的
+`manifest.webmanifest`、`sw.js`、`icons/*` 可能一个都没上去——线上 404，而仓里的引擎测试与
+真浏览器闸全绿，因为它们跑的都是仓库根，没有任何一步在「按清单拷」的那个环境下加载过页面。
+
+现在清单只有一份，住在 `tools/assemble-site.sh`：CI 调它拷 `_site`，本地闸调它拷临时目录，
+然后**对拷出来的产物**提要求（`tools/deploy-set.mjs`）：
+
+- **W 清单与页面同源**：`pages.yml` 里必须真有 `run: bash tools/assemble-site.sh <dir>` 这一行，
+  `ci.yml` 里必须真有 `run: node tools/deploy-set.mjs`。认的是调用那一行，不是文件里出现过这个
+  路径——注释里本来就会写它，只 grep 字符串会被一句散文喂绿。
+- **R 引用可达**：引用不靠手打名单。从 `index.html` 的 `href/src` 出发，凡解析出来是 `.js`/`.css`
+  的就把那一站也扫一遍（CSS 的 `url()`、JS 去掉注释后的 `'./…'` 字面量、`new URL(x, base)` 的两种
+  基、`navigator.serviceWorker.register`、`scope`），`manifest` 的 icons/screenshots/shortcuts 各自
+  的 `src` 也算引用。取径上读不到的那一站本身就是红（读不到＝这一站根本没扫）。每条引用都必须在
+  产物里且非 0 字节；绝对路径单列一条红，因为 Pages 挂在 `/<repo>/` 前缀下会跳出去。
+- **P 位图不许说谎**：`manifest` 声明的 `sizes` 必须等于 PNG IHDR 的真实宽高——文件图标读文件头，
+  内联成 base64 的图标先解码再读同一段。后一条不是可选项：图标可能住在清单里而不是盘上的 `.png`
+  （有的仓另有一条"零二进制文件"的承诺，那条只约束"有没有 .png 这个文件"）；如果 P 段只筛文件名，
+  声明写 512 而真图 192 就一路放行。
+- **钉住两个数**：R 段实际检查的路径条数（`31`）与这一次跑的断言条数（`49`），两个数
+  都钉在 `tools/deploy-set.mjs` 顶部的那对常量里。没改页面却掉了，说明解析断了；删掉一张图标会同时
+  少一条 R10 与那张的 P1/P2，所以两个数一起钉，断言条数能漂就是闸在缩水的信号。这一节故意只写数值、
+  不写那对常量的名字，也不写别仓文档闸的编号：有的仓的文档闸会拿"文档里出现过的同名标识号"回数它
+  自己的条数，还有的会把文档里点到的每个组编号逐个核对"这一轮真的发过"——两道闸共用一个名字，
+  或者在本仓的文档里出现一个本仓没有的组编号，打红的都是不相干的那一边。
+
+`tools/deploy-set-selftest.mjs` 是这两颗钉的阳性证明：它把仓库复制到临时目录，照着每一类断言
+各下一刀（X1 清单不收位图目录 / X2 模块边改名 / X3 CSS 写绝对路径 / X4 `start_url` 绝对 /
+X5 删光 >=512 图标 / X6 少一个必填字段 / X7 声明尺寸与真图不符 / X8 workflow 不调脚本 /
+X9 CI 不跑闸 / X10 是阴性对照——往入口 JS 追加一行只写在注释里的假路径，闸必须仍然绿、条数仍然
+`31`、断言仍然 `49`；X11 og:image 退回相对路径 / X12 og:image 的前缀指向别的 slug /
+X13 内联位图谎报尺寸——只在有靶子时下：X11/X12 要页面上那句 og:image，X13 要清单里真有一段 base64
+图标，没有就打印 SKIP；反过来 X1 没有位图目录可砍时改砍 css，P 段一位都不核时台架直接报靶子不够），
+要求每一刀都让闸**点名**变红。靶子从 `DEPLOY_SET_DUMP=1`
+的出处表现挑（取径真的会读的那支 JS / 那一张 CSS，不写死某一个仓的入口名），所以页面改了、仓与仓
+不同，台架跟着走。
+
+`node tools/deploy-set.mjs` 与 `node tools/deploy-set-selftest.mjs` 就是 CI 跑的那两条命令本身
+（package.json 里的 `deploy-set` / `deploy-set:selftest` 只是同一支脚本的 npm 入口）；本仓的整闸在 `tools/verify.sh` 的 `=== deploy-set ===` 那一段也各跑一次。它们红的时候并进本仓那条出口的退出码——这一条是这么证的：
+把 ci.yml 里那行 `run: node tools/deploy-set.mjs` 砍掉，本仓整闸必须点名红且退出码非 0。
+所以「本地全绿、线上 404 自己的 manifest / sw.js / 图标」这一类坏法在本地就会红。
+

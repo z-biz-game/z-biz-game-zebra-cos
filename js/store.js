@@ -23,7 +23,10 @@ export function pack(state) {
 // load/clear 仍收注入的 sink：浏览器闸要拿一个假的 {getItem} 单测解码，不能钉死到真存储上。
 export function save(state) {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(pack(state)));
+    const text = JSON.stringify(pack(state));
+    // 生产里传进来的就是存储全局量本身（见 js/main.js）；注入了替身时走替身。
+    if (store === globalThis.localStorage) globalThis.localStorage.setItem(SAVE_KEY, text);
+    else store.setItem(SAVE_KEY, text);
     return true;
   } catch {
     return false;                       // 无痕模式 / 配额爆：静默继续玩，但不假装存住了
@@ -34,7 +37,7 @@ export function save(state) {
 export function load(store) {
   let raw = null;
   try {
-    raw = store.getItem(SAVE_KEY);
+    raw = store === globalThis.localStorage ? globalThis.localStorage.getItem(SAVE_KEY) : store.getItem(SAVE_KEY);
   } catch {
     return null;
   }

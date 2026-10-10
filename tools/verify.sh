@@ -96,7 +96,7 @@ if [ "$CUSTOM" = 0 ]; then
   echo "  两种形态各用一个 HTTP 端口：origin 不同 ⇒ localStorage 各一套；CDP 一条腿一个新 profile 一次重启"
 else
   CDP=${CDP_PORT:-$CDP_WANT}
-  echo "BASE_URL given → 只跑部署件这一种形态，本脚本不起任何服务（CDP $CDP）"
+  echo "BASE_URL given → 只跑部署件这一种形态，本脚本不起任何服务（CDP ${CDP}）"
 fi
 echo "logs: $LOGDIR"
 echo "loadavg（跑之前的读数，本机可能同时坐着别的 agent）：$(sysctl -n vm.loadavg 2>/dev/null || cat /proc/loadavg)"
@@ -113,6 +113,11 @@ WANT_N=$(( $(echo ${SCENARIOS:-$SCENARIOS_DONE} | wc -w | tr -d ' ') + 3 ))
 # 就是浏览器加载的那批 js/ 模块），红了读作"页面与 node 不再是同一批盘"。
 echo "=== node re-derives the fixture pinned in tools/scenarios.js ==="
 node tools/fixtures.mjs --check || FAILED=1
+# 部署集闸：ci.yml 跑这两步、本地整闸以前一次都不跑（59 仓同形）。「本地全绿、线上 404 自己的
+# manifest / sw.js / 图标」这一类坏法缺的就是这一步。它不碰 Chrome，所以放在浏览器腿之前。
+echo "=== deploy-set ==="
+node tools/deploy-set.mjs || FAILED=1
+node tools/deploy-set-selftest.mjs || FAILED=1
 
 # ---- machine-readable RESULT line ----------------------------------------------------------------
 # playtest.cjs 把 RESULT 打在 stdout 最后一行、console 噪音留在 stderr。这里不数行数就不叫跑过：
@@ -158,7 +163,7 @@ preflight() {
   local base=$1 rel want got f served
   served=$(curl -fsS -m 8 "$base" 2>/dev/null) || { echo "  首页取不到：$base" >&2; return 1; }
   case "$served" in *js/main.js*) ;; *) echo "  $base 上发的不是本仓的首页（正文里找不到 js/main.js）" >&2; return 1 ;; esac
-  case "$served" in *"$FEATURE"*) ;; *) echo "  $base 在发别的应用：首页正文里找不到「$FEATURE」" >&2; return 1 ;; esac
+  case "$served" in *"$FEATURE"*) ;; *) echo "  $base 在发别的应用：首页正文里找不到「${FEATURE}」" >&2; return 1 ;; esac
   for rel in $PREFLIGHT_RELS; do
     want=$(wc -c < "$HERE/$rel" | tr -d ' ')
     [ -n "$want" ] || { echo "  $rel 在磁盘上读不到，闸没有可对的基准" >&2; return 1; }
@@ -166,11 +171,11 @@ preflight() {
     got=$(curl -sS -m 8 -o "$f" -w '%{http_code} %{size_download}' "$base$rel" 2>/dev/null) || {
       echo "  $rel 取不回来：$base$rel" >&2; return 1; }
     case "$got" in "200 $want") ;; *)
-      echo "  $rel 不对味：$base$rel 回 $got，磁盘上的这份是 200 $want 字节" >&2
+      echo "  $rel 不对味：$base$rel 回 ${got}，磁盘上的这份是 200 $want 字节" >&2
       echo "  前两行到手内容：$(head -c 160 "$f" | tr '\n' ' ')" >&2
       return 1 ;; esac
   done
-  echo "  预检：首页含「$FEATURE」与 js/main.js · $(echo $PREFLIGHT_RELS | wc -w | tr -d ' ') 条真实模块路径按字节对上磁盘"
+  echo "  预检：首页含「${FEATURE}」与 js/main.js · $(echo $PREFLIGHT_RELS | wc -w | tr -d ' ') 条真实模块路径按字节对上磁盘"
   return 0
 }
 
@@ -232,7 +237,7 @@ run_url_legs() {
   echo "=== [$shape] urlseed 第二趟（同一个 URL，重开一次真导航） ==="
   run_one "$shape" urlseed '' "$nav"
   cp "$LOGDIR/$shape-urlseed.extra.json" "$LOGDIR/$shape-urlseed-b.json" 2>/dev/null
-  echo "=== [$shape] urlseed 第三趟（换 seed：$navc，存档里是上一趟的 $URL_SEED） ==="
+  echo "=== [$shape] urlseed 第三趟（换 seed：${navc}，存档里是上一趟的 ${URL_SEED}） ==="
   run_one "$shape" urlseed '{"expectResumed":false}' "$navc"
   cp "$LOGDIR/$shape-urlseed.extra.json" "$LOGDIR/$shape-urlseed-c.json" 2>/dev/null
   node -e '
