@@ -19,6 +19,24 @@ import { TIERS } from './engine/generate.js';
 import { CHECK, CROSS, EMPTY, Game, assessBoard, boardIsProven, makeBoard } from './ui/game.js';
 import { COLORS, GridView } from './render/board.js';
 import { SAVE_KEY, clear as clearSave, load, save } from './store.js';
+// 听觉这一路反馈：视觉与数值之外，桌面上还该有"听得见"的一路。
+// 音频模块自己管手势解锁与真静音（suspend），这里只管把音接到引擎的判定上。
+import { audio } from './audio.js';
+
+/**
+ * 触觉：仓里已经有一份垫片（js/haptics.js，用 <script> 引入，暴露 window.haptic）。
+ * 这里**不另造一套**：只在引擎判定的分支上叫它一声，让"被拒"与"通关"有各自的档。
+ *
+ * ⚠️ 触觉是补路，不是主路：navigator.vibrate 在 iOS Safari 上不存在，
+ *    桌面 Chrome 也需用户激活且体感弱 ⇒ 不能拿它顶替听觉。
+ */
+function haptic(kind) {
+  try {
+    if (typeof window !== 'undefined' && typeof window.haptic === 'function') window.haptic(kind);
+  } catch (_) {
+    /* 没有这一路就算了：它本来就是补路 */
+  }
+}
 
 const $ = (id) => document.getElementById(id);
 const dom = {
@@ -211,15 +229,22 @@ function judgeAnswer() {
   if (!out.complete) {
     dom.verdict.textContent = `还有 ${out.missing} 个位置没填，不判。`;
     dom.verdict.classList.add('bad');
+    audio.play('wrong');         // 引擎说还填不完，不判
+    haptic('err');
     return { complete: false, missing: out.missing, ok: false, text: dom.verdict.textContent };
   }
   if (!out.res.ok) {
     dom.verdict.textContent = `不满足：${out.res.reasons.slice(0, 3).join(' / ')}`;
     dom.verdict.classList.add('bad');
+    audio.play('wrong');         // 引擎的 checkSolution 说这份分配不成立
+    haptic('err');
     return { complete: true, ok: false, reasons: out.res.reasons, text: dom.verdict.textContent };
   }
   const owner = g.petOwner(out.claim);
   g.solved = true;
+  // 通关只响一次：引擎的 checkSolution 说这份分配成立才响。
+  audio.play('win');
+  haptic('win');
   dom.verdict.textContent = `全部 ${g.board.clueCount} 条线索为真 · 每类各用一次 —— 按你填的：${owner ? `${owner.who} 养 ${owner.item}（第 ${owner.house} 间）` : '这一问读不出来，但分配本身成立'}`;
   dom.verdict.classList.add('ok');
   return { complete: true, ok: true, owner, text: dom.verdict.textContent };
@@ -295,6 +320,21 @@ function persist() {
 }
 
 // ── 真指针与键盘 ─────────────────────────────────────────────────────────────
+/** 键盘那一路落子：和指针那一路是同一个引擎入口（setCell），所以声音也一样。 */
+function mark(p, i, j, val) {
+  const g = app.game;
+  if (!g) return false;
+  const changed = val === null ? g.tap(p, i, j) : g.press(p, i, j, val);
+  if (changed) {
+    audio.play('correct');
+    haptic('tap');
+  } else {
+    audio.play('blocked');       // 引擎说这一格没改成
+    haptic('err');
+  }
+  return changed;
+}
+
 function onCanvasPointer(ev) {
   const g = app.game;
   if (!g) return;
@@ -304,7 +344,15 @@ function onCanvasPointer(ev) {
   ev.preventDefault();
   g.cursor.i = cell.row;
   g.cursor.j = cell.col;
-  g.tap(g.cursor.p, cell.row, cell.col);
+  // 声音接在**引擎的判定**上：setCell 回 true = 引擎真改了那一格；
+  // 回 false = 那一格已经是这个记号了（点一下什么都没变）。
+  if (g.tap(g.cursor.p, cell.row, cell.col)) {
+    audio.play('correct');
+    haptic('tap');
+  } else {
+    audio.play('blocked');
+    haptic('err');
+  }
   app.lastHint = null;
   g.clearHint();
   paint();
@@ -322,10 +370,10 @@ function onKey(ev) {
   else if (k === 'ArrowRight') c.j = Math.min(N - 1, c.j + 1);
   else if (k === 'ArrowUp') c.i = Math.max(0, c.i - 1);
   else if (k === 'ArrowDown') c.i = Math.min(N - 1, c.i + 1);
-  else if (k === 'x' || k === 'X') g.press(c.p, c.i, c.j, CROSS);
-  else if (k === 'o' || k === 'O') g.press(c.p, c.i, c.j, CHECK);
-  else if (k === ' ') g.tap(c.p, c.i, c.j);
-  else if (k === 'Backspace' || k === 'Delete') g.press(c.p, c.i, c.j, EMPTY);
+  else if (k === 'x' || k === 'X') mark(c.p, c.i, c.j, CROSS);
+  else if (k === 'o' || k === 'O') mark(c.p, c.i, c.j, CHECK);
+  else if (k === ' ') mark(c.p, c.i, c.j, null);
+  else if (k === 'Backspace' || k === 'Delete') mark(c.p, c.i, c.j, EMPTY);
   else if (k === '[') selectPair((c.p + g.nPairs - 1) % g.nPairs);
   else if (k === ']') selectPair((c.p + 1) % g.nPairs);
   else handled = false;
@@ -349,13 +397,26 @@ dom.hint.addEventListener('click', () => {
   const g = app.game;
   if (!g) return;
   app.lastHint = g.hint();
+  if (app.lastHint) {
+    audio.play('move');         // 提示：只说下一步，不代落
+    haptic('tap');
+  } else {
+    audio.play('wrong');        // 引擎说推不动了
+    haptic('err');
+  }
   paint();
   persist();
 });
 dom.undo.addEventListener('click', () => {
   const g = app.game;
   if (!g) return;
-  g.undo();
+  if (g.undo()) {
+    audio.play('move');         // 盘面退了一步
+    haptic('tap');
+  } else {
+    audio.play('wrong');        // 没有可退的一步
+    haptic('err');
+  }
   paint();
   persist();
 });
@@ -365,6 +426,8 @@ dom.clear.addEventListener('click', () => {
   g.clearMarks();
   g.steps = 0;
   app.lastHint = null;
+  audio.play('move');           // 盘面清空了
+  haptic('tap');
   paint();
   persist();
 });
@@ -550,4 +613,27 @@ window.zebra.boot = { requested: bootReq, resumed: !!(boot.ok && boot.resumed), 
   window.addEventListener('webkitfullscreenchange', sync);
   window.addEventListener('MSFullscreenChange', sync);
   sync();
+})();
+
+// ---- 音效开关（#btn-sound）----
+//
+// 静音走 `audio.setMuted(true)`，那是 `ctx.suspend()`：整个 AudioContext 挂起。
+// **不许**改成像"把 master.gain 拧到 0"那样 —— 只拧 gain 是假静音：节点照建、时钟照跑，
+// 取消静音之后还有一截尾巴在响。真正的静音必须是挂起整个上下文。
+//
+// 按钮找不到就不装（和全屏那一条同一条纪律）：留一串没人按的代码等于没做这个功能。
+(function bindSound() {
+  const btn = document.getElementById('btn-sound');
+  if (!btn) return;
+  function paint() {
+    const on = !audio.muted;
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '音效：开' : '音效：关';
+    btn.title = on ? '点击关闭音效' : '点击开启音效';
+  }
+  btn.addEventListener('click', () => {
+    audio.setMuted(!audio.muted);
+    paint();
+  });
+  paint();
 })();
