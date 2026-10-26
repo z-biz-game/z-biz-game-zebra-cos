@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0a12">
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="twitter:card" content="summary">
 <title>谁养鱼 ZEBRA · 逻辑格</title>
@@ -13,6 +16,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/studio.css" />
 </head>
 <body>
   <header>
@@ -34,6 +38,7 @@
       <button id="btn-hint" type="button">提示</button>
       <button id="btn-undo" type="button">撤销</button>
       <button id="btn-clear" type="button">清空注记</button>
+      <button type="button" id="btn-sound" aria-pressed="true" title="音效开关">音效：开</button>
       <button id="btn-fullscreen" type="button" aria-pressed="false" title="全屏（F）">全屏</button>
       <span class="readouts">
         <span id="stat-steps" class="stat">0 手</span>
@@ -84,5 +89,7 @@
 
   <script type="module" src="js/main.js"></script>
   <script src="js/sw-register.js"></script>
+<script src="js/haptics.js"></script>
+  <div class="studio-atmosphere" aria-hidden="true"></div>
 </body>
 </html>
