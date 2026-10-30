@@ -48,7 +48,7 @@ const dom = {
   question: $('question'), receipt: $('receipt'), answer: $('answer'), answerGrid: $('answer-grid'),
   verdict: $('verdict'), reject: $('reject'), rejectDetail: $('reject-detail'),
   saveNote: $('save-note'), boardWrap: $('board-wrap'),
-  time: $('stat-time'), pause: $('btn-pause'), mute: $('btn-mute'), full: $('btn-full'), brand: $('brand'),
+  time: $('stat-time'), pause: $('btn-pause'), full: $('btn-full'), brand: $('brand'),
 };
 
 const app = { game: null, proof: null, view: new GridView(dom.canvas), proven: false, saveOk: true, rejected: null, lastHint: null };
@@ -357,7 +357,6 @@ function onCanvasPointer(ev) {
   }
   app.lastHint = null;
   g.clearHint();
-  blip(540);
   paint();
   persist();
 }
@@ -443,48 +442,6 @@ window.addEventListener('resize', paint);
 const reduceMotion = (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)'))
   || { matches: false };
 
-// ── 声音：WebAudio 轻提示音 + 真静音（suspend/resume，不是把音量设 0 骗过去）──────────
-const audio = { ctx: null, muted: false };
-function ensureCtx() {
-  if (audio.ctx || audio.muted) return audio.ctx;
-  try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) audio.ctx = new AC();
-  } catch { audio.ctx = null; }
-  return audio.ctx;
-}
-function blip(freq) {
-  if (audio.muted) return;
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  try {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'triangle';
-    o.frequency.value = freq;
-    g.gain.value = 0.04;
-    o.connect(g);
-    g.connect(ctx.destination);
-    const t = ctx.currentTime;
-    o.start(t);
-    o.stop(t + 0.06);
-  } catch { /* 无声设备 / 权限：静默跳过，绝不 console.error（闸会把它记成异常）*/ }
-}
-function renderMute() {
-  if (!dom.mute) return;
-  dom.mute.setAttribute('aria-pressed', String(audio.muted));
-  dom.mute.textContent = audio.muted ? '已静音' : '音效';
-}
-function toggleMute() {
-  audio.muted = !audio.muted;
-  if (audio.ctx) {
-    const p = audio.muted ? audio.ctx.suspend() : audio.ctx.resume();
-    if (p && typeof p.catch === 'function') p.catch(() => {});   // 拒绝也不能变成 unhandledrejection
-  }
-  renderMute();
-  return audio.muted;
-}
-
 // ── 秒表：rAF 累计真实 elapsed，帧率无关（见 js/ui/stopwatch.js 的不变式）─────────────
 const sw = makeStopwatch();
 function fmtTime(total) {
@@ -521,11 +478,9 @@ function toggleFullscreen() {
   } catch { /* 环境不支持：忽略 */ }
 }
 
-if (dom.pause) dom.pause.addEventListener('click', () => { togglePause(sw); renderPause(); blip(sw.running ? 660 : 300); });
-if (dom.mute) dom.mute.addEventListener('click', () => { toggleMute(); if (!audio.muted) blip(520); });
+if (dom.pause) dom.pause.addEventListener('click', () => { const on = togglePause(sw); renderPause(); audio.play(on ? 'move' : 'tap'); });
 if (dom.full) dom.full.addEventListener('click', () => toggleFullscreen());
 renderPause();
-renderMute();
 window.requestAnimationFrame(loop);
 
 // ── 可安装：注册 SW（network-first，在线时行为等价于没有 SW）。失败必须 .catch 到空，
@@ -589,7 +544,7 @@ window.zebra = {
   get elapsed() { return sw.seconds; },
   get muted() { return audio.muted; },
   togglePause: () => { togglePause(sw); renderPause(); return sw.running; },
-  toggleMute,
+  toggleMute: () => { audio.setMuted(!audio.muted); return audio.muted; },
   toggleFullscreen,
   gate: {
     /**

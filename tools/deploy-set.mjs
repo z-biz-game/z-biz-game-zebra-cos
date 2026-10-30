@@ -31,11 +31,16 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSEMBLE = 'tools/assemble-site.sh';
 // R 段实际检查的路径条数。改页面/清单会改变它——那正是要它变的时候；没改页面却掉了，
 // 说明引用解析不出来的那部分被悄悄放过了。对着 DEPLOY_SET_DUMP=1 的出处表能逐条核。
-const EXPECT_CHECKS = 31;
+//
+// 这两个数钉的是**实数**：上一次钉在 31 / 50 之后，页面又挂了 css/studio.css、
+// js/haptics.js、favicon 这几条取径，模块图也长出了新的边，却没跟改钉子，闸就一直红在
+// 37 / 56。同一轮还查出 studio.css 内联 SVG 里的 url(%23n) 被当成一条取径（38 条里虚高
+// 一条）——data: URI 现在先抹掉再扫，37 才是真的。
+const EXPECT_CHECKS = 37;
 // 全绿时这个闸实际跑的断言条数（W/R/P 三段之和）。钉住它，「少一条断言」就不可能是绿的：
 // 删掉 manifest 里的一张图标会同时少一条 R10 与那张的 P1/P2 两行——那条路径缺文件本来就该红，
 // 但 rows 能漂就是闸在缩水的信号，所以两个数一起钉。
-const EXPECT_ROWS = 50;
+const EXPECT_ROWS = 56;
 
 let rows = 0;
 const fails = [];
@@ -168,6 +173,13 @@ const stripComments = (src, blocksOnly) => {
   return out;
 };
 
+// 把内联 data: URI 整段换成占位，长度不是重点（本闸不拿它做行号），只求它里面再出现的
+// url(#id) 之类不会被当成一条取径。带引号与不带引号两种写法都认，且先吃带引号的，
+// 否则内层的 %23n 会被先切出来。
+const maskDataUrls = (css) => css
+  .replace(/url\(\s*(['"])data:[\s\S]*?\1\s*\)/gi, 'url(data:masked)')
+  .replace(/url\(\s*data:[^)\s]*/gi, 'url(data:masked');
+
 const dirOf = (r) => {
   const d = path.posix.dirname(r);
   return d === '.' ? '' : d;
@@ -251,7 +263,11 @@ for (let k = 0; k < refs.length; k += 1) {
     continue;
   }
   if (r.endsWith('.css')) {
-    for (const m of stripComments(text, true).matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
+    // data: URI 里可以合法地再写 url(#id)（studio.css 的 SVG 噪点滤镜就是 url(%23n)）。
+    // 那不是一条取径，按它解析出来的是 css/%23n 这种产物里永远不会有的文件名——先把整段
+    // data: URI 抹成占位再扫，否则这条闸会为一段内联图形永远红着，而真有引用缺文件时反被淹没。
+    const css = maskDataUrls(stripComments(text, true));
+    for (const m of css.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)) {
       push(r, m[1], dirOf(r));
     }
     continue;
